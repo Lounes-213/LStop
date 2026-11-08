@@ -12,7 +12,7 @@ class TimizarDriverApp extends ConsumerWidget {
     final router = ref.watch(driverRouterProvider);
 
     return MaterialApp.router(
-      title: 'Timizar Driver',
+      title: 'LStop.c',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../providers.dart';
-import '../features/auth/login_screen.dart';
+import '../features/splash/splash_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/search/search_screen.dart';
 import '../features/ride_request/ride_request_sheet.dart';
@@ -9,37 +8,23 @@ import '../features/live_tracking/live_tracking_screen.dart';
 import '../features/trip_history/trip_history_screen.dart';
 import '../features/favorites/favorites_screen.dart';
 import '../features/safety/sos_dialog.dart';
+import '../features/devices/connected_devices_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authStateProvider);
-
   return GoRouter(
-    initialLocation: '/',
-    redirect: (context, state) {
-      final isLoading = authState.isLoading;
-      final isAuthenticated = authState.value != null;
-      final isLoginRoute = state.uri.path == '/login';
-
-      if (isLoading) return null;
-
-      if (!isAuthenticated && !isLoginRoute) {
-        return '/login';
-      }
-
-      if (isAuthenticated && isLoginRoute) {
-        return '/';
-      }
-
-      return null;
-    },
+    initialLocation: '/splash',
     routes: [
       GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(nextRoute: '/'),
       ),
       GoRoute(
         path: '/',
         builder: (context, state) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: '/devices',
+        builder: (context, state) => const ConnectedDevicesScreen(),
       ),
       GoRoute(
         path: '/search',

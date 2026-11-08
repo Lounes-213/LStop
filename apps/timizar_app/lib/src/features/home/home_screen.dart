@@ -1,8 +1,15 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:timizar_core/timizar_core.dart';
-import '../../providers.dart';
+import 'package:latlong2/latlong.dart';
+import '../location/live_location_service.dart';
+import '../map/open_street_map_widget.dart';
+import '../splash/lstop_emblem.dart';
+import '../transport/fourgon_model.dart';
+import '../transport/fourgon_provider.dart';
+import '../transport/routing_service.dart';
+import 'driver_profiles_bottom_sheet.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -11,292 +18,311 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  // Realtime active drivers in this zone
-  final Map<String, DriverLocation> _nearbyDrivers = {};
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with TickerProviderStateMixin {
+  final MapController _mapController = MapController();
+  final DraggableScrollableController _sheetController =
+      DraggableScrollableController();
 
-  // Current passenger location (Tizi Ouzou default)
-  static const double _currentLat = AppConstants.defaultTiziOuzouLat;
-  static const double _currentLng = AppConstants.defaultTiziOuzouLng;
+  // Mode OSM Standard (couleurs & noms des places) vs Satellite
+  bool _isSatellite = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _initRealtimeSubscription();
-  }
-
-  void _initRealtimeSubscription() {
-    final userAsync = ref.read(authStateProvider);
-    final userId = userAsync.value?.id ?? 'anon';
-    final geohash5 = GeohashHelper.encode(_currentLat, _currentLng, precision: 5);
-
-    final realtime = ref.read(realtimeClientProvider);
-    realtime.connectToZone(
-      geohash5: geohash5,
-      userId: userId,
-      role: 'passenger',
-      lat: _currentLat,
-      lng: _currentLng,
+  /// Déplacement fluide et animé de la caméra vers une destination (et non sec/direct)
+  void _smoothMoveTo(LatLng destLocation, double destZoom) {
+    final latTween = Tween<double>(
+      begin: _mapController.camera.center.latitude,
+      end: destLocation.latitude,
+    );
+    final lngTween = Tween<double>(
+      begin: _mapController.camera.center.longitude,
+      end: destLocation.longitude,
+    );
+    final zoomTween = Tween<double>(
+      begin: _mapController.camera.zoom,
+      end: destZoom,
     );
 
-    realtime.messageStream.listen((msg) {
-      if (!mounted) return;
-      if (msg is NearbyDriversMessage) {
-        setState(() {
-          _nearbyDrivers.clear();
-          for (final d in msg.drivers) {
-            final loc = DriverLocation.fromJson(d);
-            _nearbyDrivers[loc.driverId] = loc;
-          }
-        });
-      } else if (msg is DriverMovedMessage) {
-        setState(() {
-          _nearbyDrivers[msg.driverId] = DriverLocation(
-            driverId: msg.driverId,
-            latitude: msg.latitude,
-            longitude: msg.longitude,
-            heading: msg.heading,
-          );
-        });
-      } else if (msg is DriverLeftMessage) {
-        setState(() {
-          _nearbyDrivers.remove(msg.driverId);
-        });
+    final animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 750),
+    );
+
+    final animation = CurvedAnimation(
+      parent: animController,
+      curve: Curves.easeInOutCubic,
+    );
+
+    animController.addListener(() {
+      _mapController.move(
+        LatLng(latTween.evaluate(animation), lngTween.evaluate(animation)),
+        zoomTween.evaluate(animation),
+      );
+    });
+
+    animController.addStatusListener((status) {
+      if (status == AnimationStatus.completed ||
+          status == AnimationStatus.dismissed) {
+        animController.dispose();
       }
     });
+
+    animController.forward();
+  }
+
+  void _collapseBottomSheet() {
+    if (_sheetController.isAttached) {
+      if (_sheetController.size > 0.25) {
+        _sheetController.animateTo(
+          0.22,
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    }
+  }
+
+  void _expandBottomSheet() {
+    if (_sheetController.isAttached) {
+      _sheetController.animateTo(
+        0.70,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  void _toggleMapMode() {
+    setState(() => _isSatellite = !_isSatellite);
+  }
+
+  Future<void> _routeToDriver(Fourgon driver) async {
+    final liveLoc = ref.read(liveLocationProvider);
+    final userPos = liveLoc.position; // VRAIE POSITION GPS RÉELLE DU USER
+
+    // Calcule le tracé routier réel reliant VOTRE POSITION au CHAUFFEUR
+    final route = await RoutingService.getRoadRoute(userPos, driver.currentLocation);
+
+    if (route != null && mounted) {
+      final transportNotifier = ref.read(transportProvider.notifier);
+      transportNotifier.selectFourgon(
+        driver.copyWith(routePoints: route.points),
+      );
+
+      _smoothMoveTo(driver.currentLocation, 14.8);
+      _collapseBottomSheet();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(authStateProvider).value;
+    // 1. VRAIE POSITION GPS RÉELLE DU USER
+    final liveLocState = ref.watch(liveLocationProvider);
+    final userPos = liveLocState.position;
+    final userHeading = liveLocState.heading;
+
+    // 2. Transport State
+    final transportState = ref.watch(transportProvider);
+    final transportNotifier = ref.read(transportProvider.notifier);
+    final visibleFourgons = transportState.visibleFourgons;
 
     return Scaffold(
-      key: _scaffoldKey,
-      drawer: _buildAppDrawer(context, user),
       body: Stack(
         children: [
-          // 1. Map View
-          const TimizarMapView(
-            initialLat: _currentLat,
-            initialLng: _currentLng,
+          // 1. OpenStreetMap (OSM Standard avec toutes les couleurs & noms OU Satellite)
+          OpenStreetMapWidget(
+            mapController: _mapController,
+            userLocation: userPos,
+            userHeading: userHeading,
+            isSatellite: _isSatellite,
+            fourgons: transportState.fourgons,
+            selectedFourgon: transportState.selectedFourgon,
+            activeRoutePolyline: transportState.activeRoutePolyline,
+            onMapInteraction: _collapseBottomSheet,
+            onFourgonSelected: (driver) {
+              _routeToDriver(driver);
+            },
           ),
 
-          // 2. User Center Position Marker (matching blue navigation arrow from screenshot)
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 120),
-              child: Transform.rotate(
-                angle: -0.2, // Slight tilt matching arrow in screenshot
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2E7CF6),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 3.5),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x40000000),
-                        blurRadius: 10,
-                        offset: Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.navigation_rounded,
-                      color: Colors.white,
-                      size: 26,
+          // 2. BANDEAU SUPÉRIEUR : BOUTON S + ITINÉRAIRE DÉTAILLÉ AU MILIEU + BOUTON POSITION
+          Positioned(
+            top: 52,
+            left: 16,
+            right: 16,
+            child: Row(
+              children: [
+                // Bouton Circulaire Logo (Emblème 'S' - Bascule OSM / Satellite)
+                _buildCircularLogoButton(),
+                const SizedBox(width: 8),
+
+                // ITINÉRAIRE DÉTAILLÉ PLACÉ AU MILIEU ENTRE LES DEUX BOUTONS
+                if (transportState.routeSummary != null)
+                  Expanded(
+                    child: _buildDetailedRouteBanner(
+                      summary: transportState.routeSummary!,
+                      selectedFourgon: transportState.selectedFourgon,
+                      onClose: () {
+                        transportNotifier.clearSelection();
+                      },
                     ),
-                  ),
-                ),
-              ),
+                  )
+                else
+                  const Spacer(),
+
+                const SizedBox(width: 8),
+                // Bouton Circulaire Position GPS
+                _buildCircularPositionButton(userPos),
+              ],
             ),
           ),
 
-          // 3. Top Floating Hamburger Menu Button (exact match from screenshot)
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.only(left: 16.0, top: 12.0),
-              child: Material(
-                color: Colors.white,
-                elevation: 4,
-                shadowColor: Colors.black26,
-                borderRadius: BorderRadius.circular(16),
-                child: InkWell(
-                  onTap: () => _scaffoldKey.currentState?.openDrawer(),
-                  borderRadius: BorderRadius.circular(16),
-                  child: const SizedBox(
-                    width: 52,
-                    height: 52,
-                    child: Center(
-                      child: Icon(
-                        Icons.menu_rounded,
-                        color: Color(0xFF1E293B),
-                        size: 26,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // 4. Bottom Sheet (Exact Match from screenshot)
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: _buildPassengerBottomSheet(context),
+          // 3. VOLET DU BAS AVEC PROFILS DES CHAUFFEURS (Rétractable, Scrollable)
+          DriverProfilesBottomSheet(
+            sheetController: _sheetController,
+            userLocation: userPos,
+            fourgons: visibleFourgons,
+            selectedFourgon: transportState.selectedFourgon,
+            selectedLineFilter: transportState.selectedLineFilter,
+            onSelectLineFilter: transportNotifier.setLineFilter,
+            onSelectDriver: _routeToDriver,
+            onSelectSearchResult: (result) async {
+              if (result.fourgon != null) {
+                _routeToDriver(result.fourgon!);
+              } else {
+                final route =
+                    await RoutingService.getRoadRoute(userPos, result.location);
+                if (route != null && mounted) {
+                  transportNotifier.routeToDestination(
+                    start: userPos,
+                    destination: result.location,
+                    destinationName: result.title,
+                  );
+                  _mapController.move(result.location, 14.5);
+                  _collapseBottomSheet();
+                }
+              }
+            },
+            onExpandSheet: _expandBottomSheet,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPassengerBottomSheet(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x1F000000),
-            blurRadius: 20,
-            offset: Offset(0, -6),
+  /// Itinéraire Détaillé placé en haut au milieu entre les 2 boutons (avec PDP, temps approximatif et bouton X)
+  Widget _buildDetailedRouteBanner({
+    required String summary,
+    Fourgon? selectedFourgon,
+    required VoidCallback onClose,
+  }) {
+    final driver = selectedFourgon;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(26),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.94),
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.25),
+              width: 1.2,
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x28000000),
+                blurRadius: 18,
+                offset: Offset(0, 4),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Row(
             children: [
-              // Top drag indicator
-              Center(
-                child: Container(
-                  width: 42,
-                  height: 4.5,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFCBD5E1),
-                    borderRadius: BorderRadius.circular(10),
+              // PDP avatar du transporteur avec anneau de couleur de la ligne
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: driver?.lineColor ?? const Color(0xFF60A5FA),
+                    width: 2.2,
                   ),
                 ),
+                child: CircleAvatar(
+                  backgroundColor: (driver?.lineColor ?? const Color(0xFF2563EB))
+                      .withValues(alpha: 0.2),
+                  backgroundImage: driver?.avatarUrl != null
+                      ? NetworkImage(driver!.avatarUrl!)
+                      : null,
+                  onBackgroundImageError:
+                      driver?.avatarUrl != null ? (_, __) {} : null,
+                  child: driver?.avatarUrl == null
+                      ? Text(
+                          driver != null && driver.driverName.isNotEmpty
+                              ? driver.driverName[0].toUpperCase()
+                              : 'U',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: driver?.lineColor ?? Colors.white,
+                          ),
+                        )
+                      : null,
+                ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(width: 8),
 
-              // Search Bar Pill
-              TimizarSearchField(
-                hintText: 'Rechercher',
-                readOnly: true,
-                onTap: () {
-                  context.push('/search');
-                },
-              ),
-              const SizedBox(height: 14),
-
-              // Quick Action Pills ("Ajouter domicile", "Ajouter travail")
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildActionPill(
-                      icon: Icons.add_home_outlined,
-                      label: 'Ajouter domicile',
-                      onTap: () => context.push('/favorites'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _buildActionPill(
-                      icon: Icons.work_outline_rounded,
-                      label: 'Ajouter travail',
-                      onTap: () => context.push('/favorites'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // "Récents" Section Header
-              Row(
-                children: [
-                  const Text(
-                    'Récents',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF64748B),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Divider(color: Color(0xFFE2E8F0), thickness: 1),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.more_horiz_rounded, color: Color(0xFF64748B)),
-                    onPressed: () {},
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              // Recent place item (matching screenshot: "Timizart Loghbar, Tizi Ouzou, DZA")
-              InkWell(
-                onTap: () {
-                  context.push('/request', extra: {
-                    'name': 'Timizart Loghbar',
-                    'address': 'Timizart Loghbar, Tizi Ouzou, DZA',
-                    'lat': 36.7350,
-                    'lng': 4.0720,
-                  });
-                },
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.mail_outline_rounded,
-                          color: Color(0xFF475569),
-                          size: 22,
-                        ),
+              // Temps approximatif d'arrivée & détails du trajet
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      driver?.driverName ?? 'Trajet vers destination',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
                       ),
-                      const SizedBox(width: 14),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Timizart Loghbar',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF0F172A),
-                              ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Tizi Ouzou, DZA',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF64748B),
-                              ),
-                            ),
-                          ],
-                        ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      driver != null
+                          ? 'Arrivée dans ~ ${driver.etaMinutes} min • ${driver.distanceKm} km'
+                          : summary,
+                      style: const TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w500,
                       ),
-                    ],
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+
+              // Bouton X qui fait disparaître immédiatement la carte
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onClose,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.white,
+                      size: 16,
+                    ),
                   ),
                 ),
               ),
@@ -307,182 +333,90 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildActionPill({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(30),
-      child: Container(
-        height: 46,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 20, color: const Color(0xFF334155)),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF1E293B),
-                ),
-                overflow: TextOverflow.ellipsis,
+  /// Bouton circulaire blanc avec l'emblème S : bascule entre OSM couleur et Satellite
+  Widget _buildCircularLogoButton() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(26),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.90),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.8),
+              width: 1.5,
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x18000000),
+                blurRadius: 16,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _toggleMapMode,
+              borderRadius: BorderRadius.circular(26),
+              child: const Center(
+                child: LStopEmblem(size: 44),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAppDrawer(BuildContext context, User? user) {
-    return Drawer(
-      backgroundColor: Colors.white,
-      child: SafeArea(
-        child: Column(
-          children: [
-            // User Header
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: AppColors.primaryLight,
-                    backgroundImage: user?.avatarUrl != null ? NetworkImage(user!.avatarUrl!) : null,
-                    child: user?.avatarUrl == null
-                        ? const Icon(Icons.person_rounded, color: AppColors.primary, size: 30)
-                        : null,
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user?.name ?? 'Passager Timizar',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF0F172A),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          user?.email ?? 'passager@timizar.dz',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF64748B),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Navigation Links (matching screenshot 3)
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                children: [
-                  _buildDrawerItem(
-                    icon: Icons.star_border_rounded,
-                    title: 'Favoris',
-                    onTap: () {
-                      context.pop();
-                      context.push('/favorites');
-                    },
-                  ),
-                  _buildDrawerItem(
-                    icon: Icons.history_rounded,
-                    title: 'Historique des courses',
-                    onTap: () {
-                      context.pop();
-                      context.push('/history');
-                    },
-                  ),
-                  _buildDrawerItem(
-                    icon: Icons.security_rounded,
-                    title: 'Urgence & Sécurité SOS',
-                    textColor: AppColors.dangerRed,
-                    iconColor: AppColors.dangerRed,
-                    onTap: () {
-                      context.pop();
-                      context.push('/sos');
-                    },
-                  ),
-                  _buildDrawerItem(
-                    icon: Icons.settings_outlined,
-                    title: 'Paramètres',
-                    onTap: () => context.pop(),
-                  ),
-                  _buildDrawerItem(
-                    icon: Icons.info_outline_rounded,
-                    title: 'À propos de Timizar',
-                    onTap: () => context.pop(),
-                  ),
-                ],
-              ),
-            ),
-
-            // Logout Action
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.logout_rounded, size: 20),
-                label: const Text('Déconnexion'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
-                ),
-                onPressed: () async {
-                  await ref.read(authStateProvider.notifier).signOut();
-                  if (context.mounted) {
-                    context.go('/login');
-                  }
-                },
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildDrawerItem({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    Color? iconColor,
-    Color? textColor,
-  }) {
-    return ListTile(
-      leading: Icon(icon, color: iconColor ?? const Color(0xFF334155), size: 24),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-          color: textColor ?? const Color(0xFF0F172A),
+  /// Bouton circulaire de position en forme de flèche bleue : déplace la caméra avec fluidité vers votre position GPS
+  Widget _buildCircularPositionButton(LatLng userPos) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(26),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.92),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.8),
+              width: 1.5,
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x18000000),
+                blurRadius: 16,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                _smoothMoveTo(userPos, 15.2);
+              },
+              borderRadius: BorderRadius.circular(26),
+              child: Center(
+                child: Transform.rotate(
+                  angle: -0.45, // Flèche directionnelle bleue inclinée
+                  child: const Icon(
+                    Icons.navigation_rounded,
+                    color: Color(0xFF2563EB), // Bleu vif
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
-      trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8), size: 20),
-      onTap: onTap,
     );
   }
 }
