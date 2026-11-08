@@ -1,0 +1,19 @@
+name: timizar_workspace
+repository: https://github.com/timizar/timizar
+
+packages:
+  - apps/timizar_app
+  - apps/timizar_driver
+  - packages/timizar_core
+
+command:
+  bootstrap:
+    usePubspecOverrides: true
+
+scripts:
+  test:all:
+    run: melos exec --dir-exists="test" -- "flutter test"
+    description: Run all unit and widget tests across packages.
+  lint:all:
+    run: melos exec -- "flutter analyze"
+    description: Run static analysis across packages.

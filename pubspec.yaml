@@ -1,0 +1,7 @@
+name: timizar_workspace
+description: Melos workspace for Timizar Algerian ride-hailing monorepo
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dev_dependencies:
+  melos: ^8.10.1
