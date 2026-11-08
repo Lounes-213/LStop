@@ -46,7 +46,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     _entranceController.forward();
 
-    Timer(const Duration(milliseconds: 2100), () {
+    Timer(const Duration(milliseconds: 2800), () {
       if (!mounted) return;
       context.go(widget.nextRoute);
     });

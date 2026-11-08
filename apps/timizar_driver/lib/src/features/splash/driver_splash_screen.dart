@@ -33,7 +33,7 @@ class _DriverSplashScreenState extends State<DriverSplashScreen>
 
     _controller.forward();
 
-    Timer(const Duration(milliseconds: 2100), () {
+    Timer(const Duration(milliseconds: 2800), () {
       if (!mounted) return;
       context.go('/');
     });
