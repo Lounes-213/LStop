@@ -139,3 +139,4 @@ authRouter.post('/logout', authMiddleware, async (c) => {
   await revokeAllUserTokens(c.env.DB, user.userId);
   return c.json({ success: true, message: 'Logged out successfully' });
 });
+

@@ -272,3 +272,4 @@ tripsRouter.get('/history/list', async (c) => {
   const { results } = await c.env.DB.prepare(query).bind(authUser.userId).all();
   return c.json({ trips: results || [] });
 });
+

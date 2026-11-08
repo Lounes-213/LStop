@@ -52,3 +52,4 @@ class SecureTokenStorage {
     await _storage.delete(key: _keyUserId);
   }
 }
+

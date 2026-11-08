@@ -56,3 +56,4 @@ final class Failure<T, E> extends Result<T, E> {
   @override
   int get hashCode => error.hashCode;
 }
+

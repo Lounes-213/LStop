@@ -71,3 +71,4 @@ class TimizarSearchField extends StatelessWidget {
     );
   }
 }
+

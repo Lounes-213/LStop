@@ -31,6 +31,11 @@ export 'src/models/ws_message.dart';
 // Realtime
 export 'src/realtime/realtime_client.dart';
 
+// Repositories
+export 'src/repositories/auth_repository.dart';
+export 'src/repositories/driver_repository.dart';
+export 'src/repositories/trip_repository.dart';
+
 // Theme
 export 'src/theme/app_colors.dart';
 export 'src/theme/app_theme.dart';

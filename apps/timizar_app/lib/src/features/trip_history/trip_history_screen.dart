@@ -144,3 +144,4 @@ class _TripHistoryScreenState extends ConsumerState<TripHistoryScreen> {
     );
   }
 }
+

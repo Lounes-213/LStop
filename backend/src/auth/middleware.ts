@@ -29,3 +29,4 @@ export function requireRole(...allowedRoles: Array<'passenger' | 'driver' | 'adm
     await next();
   };
 }
+

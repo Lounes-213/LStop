@@ -62,3 +62,4 @@ class Driver {
     'vehicle': vehicle?.toJson(),
   };
 }
+

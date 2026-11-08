@@ -191,3 +191,4 @@ class _EarningsScreenState extends ConsumerState<EarningsScreen> {
     );
   }
 }
+

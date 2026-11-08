@@ -91,3 +91,4 @@ WsMessage parseWsMessage(Map<String, dynamic> json) {
     _ => UnknownWsMessage(json),
   };
 }
+

@@ -149,3 +149,4 @@ class SosSafetyScreen extends StatelessWidget {
     );
   }
 }
+

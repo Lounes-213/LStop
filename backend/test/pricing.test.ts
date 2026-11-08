@@ -19,3 +19,4 @@ describe('Algerian DZD Fare Calculation', () => {
     expect(fare.totalFareDzd % 10).toBe(0);
   });
 });
+

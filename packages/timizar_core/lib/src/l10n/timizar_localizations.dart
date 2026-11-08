@@ -118,3 +118,4 @@ class TimizarLocalizationsDelegate extends LocalizationsDelegate<TimizarStrings>
   @override
   bool shouldReload(TimizarLocalizationsDelegate old) => false;
 }
+

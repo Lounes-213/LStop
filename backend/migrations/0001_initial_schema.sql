@@ -117,3 +117,4 @@ CREATE TABLE IF NOT EXISTS route_cache (
     polyline TEXT NOT NULL,
     expires_at INTEGER NOT NULL
 );
+

@@ -56,3 +56,4 @@ uploadsRouter.get('/file/*', async (c) => {
 
   return new Response(object.body as any, { headers });
 });
+

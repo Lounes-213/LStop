@@ -176,3 +176,4 @@ class _DestinationSearchScreenState extends ConsumerState<DestinationSearchScree
     );
   }
 }
+

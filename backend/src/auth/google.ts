@@ -69,3 +69,4 @@ export async function verifyGoogleIdToken(
     throw new Error(`Google ID token verification failed: ${err.message}`);
   }
 }
+

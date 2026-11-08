@@ -55,7 +55,7 @@ void main() {
 
   group('DTO Serialization Tests', () {
     test('User serialization and deserialization', () {
-      final user = User(
+      const user = User(
         id: 'u1',
         email: 'passenger@timizar.dz',
         name: 'Lounes Ait',

@@ -146,3 +146,50 @@ driversRouter.get('/earnings', requireRole('driver'), async (c) => {
     }
   });
 });
+
+// Admin Approval Endpoints
+// GET /drivers/admin/pending
+driversRouter.get('/admin/pending', requireRole('admin'), async (c) => {
+  const { results } = await c.env.DB
+    .prepare(
+      `SELECT d.id, d.license_number, d.license_document_url, d.id_card_document_url, d.insurance_document_url,
+              d.approval_status, d.created_at,
+              u.name, u.email, u.phone,
+              v.make as vehicle_make, v.model as vehicle_model, v.year as vehicle_year, v.color as vehicle_color, v.license_plate
+       FROM drivers d
+       JOIN users u ON u.id = d.id
+       LEFT JOIN vehicles v ON v.driver_id = d.id AND v.is_active = 1
+       WHERE d.approval_status = 'pending'
+       ORDER BY d.created_at ASC`
+    )
+    .all();
+
+  return c.json({ pendingDrivers: results || [] });
+});
+
+// POST /drivers/admin/:id/approve
+driversRouter.post('/admin/:id/approve', requireRole('admin'), async (c) => {
+  const driverId = c.req.param('id');
+
+  await c.env.DB
+    .prepare("UPDATE drivers SET approval_status = 'approved', updated_at = unixepoch() WHERE id = ?")
+    .bind(driverId)
+    .run();
+
+  return c.json({ success: true, message: 'Chauffeur validé avec succès' });
+});
+
+// POST /drivers/admin/:id/reject
+driversRouter.post('/admin/:id/reject', requireRole('admin'), async (c) => {
+  const driverId = c.req.param('id');
+  const body = await c.req.json<{ reason?: string }>().catch(() => ({ reason: undefined }));
+
+  await c.env.DB
+    .prepare("UPDATE drivers SET approval_status = 'rejected', updated_at = unixepoch() WHERE id = ?")
+    .bind(driverId)
+    .run();
+
+  return c.json({ success: true, message: 'Dossier chauffeur rejeté', reason: body.reason });
+});
+
+

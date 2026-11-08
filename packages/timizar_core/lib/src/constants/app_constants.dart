@@ -29,3 +29,4 @@ class AppConstants {
   static const String defaultApiBaseUrl = 'http://10.0.2.2:8787'; // Android emulator localhost or production URL
   static const String defaultWsBaseUrl = 'ws://10.0.2.2:8787';
 }
+

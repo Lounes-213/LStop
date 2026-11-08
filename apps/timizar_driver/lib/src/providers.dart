@@ -137,3 +137,4 @@ final driverAuthProvider = StateNotifierProvider<DriverAuthNotifier, DriverAuthS
   final api = ref.watch(apiClientProvider);
   return DriverAuthNotifier(authService, api);
 });
+

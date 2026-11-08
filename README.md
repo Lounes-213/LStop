@@ -207,3 +207,4 @@ flutter run -d android    # Android device/emulator
   $$\text{Fare (DZD)} = \max(200, \lceil (150 + 40 \times \text{km} + 5 \times \text{min}) / 10 \rceil \times 10)$$
 - **Locales**: French (`fr`), Arabic (`ar`, RTL supported), English (`en`).
 - **Emergency Dispatch**: Integrated dialers for Police (`1548`), Protection Civile (`14`), and Gendarmerie (`1055`).
+

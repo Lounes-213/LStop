@@ -109,3 +109,4 @@ export function getSurroundingGeohashes(centerGeohash: string): string[] {
 
   return Array.from(neighbors);
 }
+

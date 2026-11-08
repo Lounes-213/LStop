@@ -168,3 +168,4 @@ class RealtimeClient {
     _messageController.close();
   }
 }
+

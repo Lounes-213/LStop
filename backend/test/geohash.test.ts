@@ -27,3 +27,4 @@ describe('Geohash & Spatial Utilities', () => {
     expect(neighbors).toContain(center);
   });
 });
+

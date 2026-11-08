@@ -67,3 +67,4 @@ class UserCoordinate {
     'address': address,
   };
 }
+

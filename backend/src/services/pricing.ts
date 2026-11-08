@@ -38,3 +38,4 @@ export function calculateAlgerianFare(
     durationMins: Math.ceil(durationMins)
   };
 }
+

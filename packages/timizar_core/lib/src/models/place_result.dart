@@ -35,3 +35,4 @@ class PlaceResult {
     'municipality': municipality,
   };
 }
+

@@ -109,14 +109,19 @@ export class ZoneRoom extends DurableObject {
         this.drivers.set(driverId, driverState);
 
         // Broadcast updated driver position to connected passengers in this cell
+        // Security requirement: precise location shared only during an active trip;
+        // general map browsing uses privacy-fuzzed coordinates (~50m jitter)
         const passengerSockets = this.ctx.getWebSockets('passenger');
         if (passengerSockets.length > 0) {
+          const fuzzedLat = driverState.lat + (Math.sin(driverState.lat * 1000) * 0.0003);
+          const fuzzedLng = driverState.lng + (Math.cos(driverState.lng * 1000) * 0.0003);
+
           const payload = JSON.stringify({
             type: 'driver_moved',
             driver: {
               driverId: driverState.driverId,
-              latitude: driverState.lat,
-              longitude: driverState.lng,
+              latitude: parseFloat(fuzzedLat.toFixed(5)),
+              longitude: parseFloat(fuzzedLng.toFixed(5)),
               heading: driverState.heading,
               isAvailable: driverState.isAvailable
             }

@@ -102,3 +102,4 @@ export async function rotateRefreshToken(
 export async function revokeAllUserTokens(db: D1Database, userId: string): Promise<void> {
   await db.prepare('UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ?').bind(userId).run();
 }
+

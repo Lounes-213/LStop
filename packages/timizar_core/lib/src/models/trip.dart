@@ -145,3 +145,4 @@ class Trip {
     'licensePlate': licensePlate,
   };
 }
+

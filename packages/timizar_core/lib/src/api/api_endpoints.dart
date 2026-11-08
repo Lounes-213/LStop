@@ -44,3 +44,4 @@ class ApiEndpoints {
     return '/ws/trip/$tripId?userId=$userId&role=$role';
   }
 }
+

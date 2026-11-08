@@ -37,3 +37,4 @@ class Vehicle {
     'licensePlate': licensePlate,
   };
 }
+

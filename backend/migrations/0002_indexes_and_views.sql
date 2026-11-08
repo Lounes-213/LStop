@@ -17,3 +17,4 @@ CREATE INDEX IF NOT EXISTS idx_trip_events_trip ON trip_events(trip_id);
 CREATE INDEX IF NOT EXISTS idx_ratings_driver ON ratings(driver_id);
 CREATE INDEX IF NOT EXISTS idx_favorites_user ON user_favorites(user_id);
 CREATE INDEX IF NOT EXISTS idx_route_cache_expires ON route_cache(expires_at);
+

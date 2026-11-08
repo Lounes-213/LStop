@@ -126,3 +126,4 @@ app.get('/ws/trip/:tripId', async (c) => {
 export { ZoneRoom, TripCoordinator };
 
 export default app;
+

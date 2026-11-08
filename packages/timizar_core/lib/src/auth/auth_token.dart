@@ -30,3 +30,4 @@ class AuthTokens {
     'expiresInSeconds': expiresInSeconds,
   };
 }
+

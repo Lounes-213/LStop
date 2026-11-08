@@ -33,3 +33,4 @@ class AppTypography {
     fontWeight: FontWeight.w400,
   );
 }
+

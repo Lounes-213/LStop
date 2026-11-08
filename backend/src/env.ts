@@ -27,3 +27,4 @@ export interface AuthUser {
   role: 'passenger' | 'driver' | 'admin';
   name: string;
 }
+

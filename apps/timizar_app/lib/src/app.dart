@@ -32,3 +32,4 @@ class TimizarApp extends ConsumerWidget {
     );
   }
 }
+

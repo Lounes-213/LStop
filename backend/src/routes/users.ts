@@ -71,3 +71,4 @@ usersRouter.delete('/favorites/:id', async (c) => {
 
   return c.json({ success: true });
 });
+
