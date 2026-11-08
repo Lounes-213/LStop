@@ -1,0 +1,19 @@
+{
+  "name": "timizar-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Production-grade ride-hailing and transport platform for Algeria",
+  "scripts": {
+    "bootstrap": "dart pub global run melos bootstrap",
+    "backend:dev": "npm --prefix backend run dev",
+    "backend:deploy": "npm --prefix backend run deploy",
+    "backend:test": "npm --prefix backend run test",
+    "melos": "dart pub global run melos"
+  },
+  "workspaces": [
+    "backend"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

@@ -2,9 +2,10 @@ name: timizar_core
 description: Shared core package for Timizar Algerian ride-hailing monorepo.
 version: 1.0.0
 publish_to: 'none'
+resolution: workspace
 
 environment:
-  sdk: '>=3.3.0 <4.0.0'
+  sdk: '>=3.5.0 <4.0.0'
   flutter: ">=3.19.0"
 
 dependencies:

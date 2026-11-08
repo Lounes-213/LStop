@@ -1,0 +1,34 @@
+name = "timizar-backend"
+main = "src/index.ts"
+compatibility_date = "2024-05-12"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "development"
+TOMTOM_BASE_URL = "https://api.tomtom.com"
+DEFAULT_LAT = "36.7118"
+DEFAULT_LNG = "4.0459"
+BASE_FARE_DZD = "150"
+PER_KM_DZD = "40"
+PER_MINUTE_DZD = "5"
+MIN_FARE_DZD = "200"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "timizar-db"
+database_id = "timizar-db-local-id"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "timizar-storage"
+
+[durable_objects]
+bindings = [
+  { name = "ZONE_ROOM", class_name = "ZoneRoom" },
+  { name = "TRIP_COORDINATOR", class_name = "TripCoordinator" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["ZoneRoom", "TripCoordinator"]

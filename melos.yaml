@@ -1,10 +1,10 @@
-name: timizar_workspace
+name: timizar
 repository: https://github.com/timizar/timizar
 
 packages:
-  - apps/timizar_app
-  - apps/timizar_driver
-  - packages/timizar_core
+  - "*"
+  - "*/*"
+  - "*/*/*"
 
 command:
   bootstrap:
