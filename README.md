@@ -1,26 +1,26 @@
-# Timizar (تيميزار) • Plateforme de Transport en Algérie
+# LStop • Plateforme de Transport Collectif & Fourgons en Algérie
 
-> **Production-grade Algerian ride-hailing & transport platform running 100% within free tiers.**  
-> Built as a unified Flutter monorepo with Cloudflare Workers, Durable Objects (WebSocket Hibernation), Cloudflare D1, R2, MapLibre GL, and TomTom API.
+> **Application de transport collectif temps réel pour l'Algérie : `LStop` (Passagers) et `LStop.c` (Chauffeurs).**  
+> Cartographie OpenStreetMap (OSM Standard et Satellite), géolocalisation GPS en direct, calcul réaliste des temps de trajet pour fourgons, navigation et recherche de lignes de transport sans dépendance propriétaire Google.
 
 ---
 
-## 1. Monorepo Topology
+## 1. Topologie du Monorepo
 
 ```
-timizar/
+LStop/
 ├── pubspec.yaml               # Native Dart workspace & Melos scripts
-├── melos.yaml                 # Monorepo configuration
+├── melos.yaml                 # Configuration Monorepo
 ├── package.json               # Root npm orchestrator
 ├── backend/                   # Cloudflare Workers + Durable Objects (TypeScript)
-│   ├── wrangler.toml          # D1, R2, and Durable Object bindings
+│   ├── wrangler.toml          # D1, R2, et Durable Object bindings
 │   ├── migrations/            # D1 SQLite migrations (schema, indexes, views)
-│   └── src/                   # Hono router, ZoneRoom DO, TripCoordinator DO, TomTom proxy
+│   └── src/                   # Hono router, ZoneRoom DO, TripCoordinator DO
 ├── packages/
-│   └── timizar_core/          # Shared models, Dio client, WS client, theme, l10n, widgets
+│   └── timizar_core/          # Modèles partagés, client Dio, WebSocket, thèmes, l10n
 └── apps/
-    ├── timizar_app/           # Passenger application ("Timizar")
-    └── timizar_driver/        # Driver application ("Timizar Driver")
+    ├── timizar_app/           # Application Passager ("LStop")
+    └── timizar_driver/        # Application Chauffeur ("LStop.c")
 ```
 
 ---
